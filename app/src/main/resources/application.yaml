@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: app
+  validation:
+    fail-on-error: false
+
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+
+
+springdoc:
+  api-docs:
+    path: /api/v3/api-docs
+  swagger-ui:
+    url: /api/v3/api-docs
+    tags-sorter: alpha
+    display-request-duration: true
+    use-root-path: false
+
+grpc:
+  auth:
+    host: ${AUTH_SERVICE_URL:localhost}
+    port: ${GRPC_PORT:9009}
