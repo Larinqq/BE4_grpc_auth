@@ -1,0 +1,200 @@
+networks:
+  app_db_network:
+    driver: bridge
+    internal: true
+  nginx_network:
+    driver: bridge
+  auth_db_network:
+    driver: bridge
+    internal: true
+  auth_server_network:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres_app_data:
+  postgres_auth_data:
+  pgadmin_data:
+
+services:
+  postgres-app-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_APP_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./db/new_ro_user.sql:/docker-entrypoint-initdb.d/new_ro_user.sql:ro
+      - postgres_app_data:/var/lib/postgresql
+    networks:
+      - app_db_network
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "${POSTGRES_APP_DB}", "-U", "${POSTGRES_USER}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 3s
+
+  postgres-auth-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_AUTH_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql
+    networks:
+      - auth_db_network
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "${POSTGRES_AUTH_DB}", "-U", "${POSTGRES_USER}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 3s
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASS}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+
+      PGADMIN_INT_KEY_SHOP_HOST: postgres-app-db
+      PGADMIN_INT_KEY_APP_DB: ${POSTGRES_APP_DB}
+
+      PGADMIN_INT_KEY_AUTH_HOST: postgres-auth-db
+      PGADMIN_INT_KEY_AUTH_DB: ${POSTGRES_AUTH_DB}
+
+      PGADMIN_SERVER_JSON_FILE: /pgadmin/servers.json
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin/servers.json:ro
+    networks:
+      - app_db_network
+      - auth_db_network
+      - nginx_network
+    depends_on:
+      postgres-app-db:
+        condition: service_healthy
+      postgres-auth-db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.31-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/static:/var/shopapi/html:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    # command: [ "nginx-debug", "-g", "daemon off;" ]
+    networks:
+      - nginx_network
+    depends_on:
+      - backend
+      - backend-ro1
+      - backend-ro2
+      - pgadmin
+
+  auth-service:
+    build:
+      context: ${AUTH_PROJECT_PATH}
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-auth-db:5432/${POSTGRES_AUTH_DB}
+      SPRING_GRPC_SERVER_PORT: ${GRPC_PORT}
+
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_ACCESS_LIFETIME: ${JWT_ACCESS_LIFETIME}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_LIFETIME: ${JWT_REFRESH_LIFETIME}
+
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    networks:
+      - auth_db_network
+      - auth_server_network
+    depends_on:
+      postgres-auth-db:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ${API_PROJECT_PATH}
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-app-db:5432/${POSTGRES_APP_DB}
+      GRPC_AUTH_HOST: auth-service
+      GRPC_AUTH_PORT: ${GRPC_PORT}
+      SPRINGDOC_API_DOCS_PATH: ${SWAGGER_API_DOCS_PATH}
+      SPRINGDOC_SWAGGER_UI_PATH: ${SWAGGER_UI_PATH}
+      SPRINGDOC_SWAGGER_UI_URL: ${SWAGGER_UI_URL}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    networks:
+      - app_db_network
+      - auth_server_network
+      - nginx_network
+    depends_on:
+      postgres-app-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+
+  backend-ro1:
+    build:
+      context: ${API_PROJECT_PATH}
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER_READONLY}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_READONLY}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-app-db:5432/${POSTGRES_APP_DB}
+      GRPC_AUTH_HOST: auth-service
+      GRPC_AUTH_PORT: ${GRPC_PORT}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRINGDOC_API_DOCS_PATH: ${SWAGGER_API_DOCS_PATH}
+      SPRINGDOC_SWAGGER_UI_PATH: ${SWAGGER_UI_PATH}
+      SPRINGDOC_SWAGGER_UI_URL: ${SWAGGER_UI_URL}
+    networks:
+      - app_db_network
+      - auth_server_network
+      - nginx_network
+    depends_on:
+      postgres-app-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      backend:
+        condition: service_started
+
+  backend-ro2:
+    build:
+      context: ${API_PROJECT_PATH}
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER_READONLY}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_READONLY}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-app-db:5432/${POSTGRES_APP_DB}
+      GRPC_AUTH_HOST: auth-service
+      GRPC_AUTH_PORT: ${GRPC_PORT}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRINGDOC_API_DOCS_PATH: ${SWAGGER_API_DOCS_PATH}
+      SPRINGDOC_SWAGGER_UI_PATH: ${SWAGGER_UI_PATH}
+      SPRINGDOC_SWAGGER_UI_URL: ${SWAGGER_UI_URL}
+    networks:
+      - app_db_network
+      - auth_server_network
+      - nginx_network
+    depends_on:
+      postgres-app-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      backend:
+        condition: service_started

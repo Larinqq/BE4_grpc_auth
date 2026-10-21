@@ -1,0 +1,22 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "App-postgres",
+      "Group": "Servers",
+      "Host": "postgres-app-db",
+      "Port": 5432,
+      "MaintenanceDB": "app_db",
+      "Username": "admin",
+      "SSLMode": "prefer"
+    },
+    "2": {
+      "Name": "Auth-postgres",
+      "Group": "Servers",
+      "Host": "postgres-auth-db",
+      "Port": 5432,
+      "MaintenanceDB": "auth_db",
+      "Username": "admin",
+      "SSLMode": "prefer"
+    }
+  }
+}

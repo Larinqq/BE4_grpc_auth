@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ahaidewi & Ganisrum BE4</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            background: #1c2022;
+        }
+        .container {
+            background: #3b4151;
+            padding: 40px 50px;
+            border-radius: 16px;
+            text-align: center;
+            border: 1px solid #2a2a40;
+        }
+        h1 {
+            color: #fff;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        p { 
+            color: #8888aa;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        .btn {
+            padding: 14px 35px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s;
+            display: inline-block;
+            background: #55a1ff;      /* ← ОДИН ЦВЕТ для всех кнопок */
+            color: #0c0000;
+        }
+        .btn:hover {
+            background: #9bc2f3;      /* ← ОДИН ЦВЕТ при наведении */
+            transform: translateY(-2px);
+        }
+    </style>    
+</head>
+<body>
+    <div class="container">
+        <h1>BE4 GRPC AUTH</h1>
+        <p>made my Ahaidewi & Ganisrum</p>
+        <div class="buttons">
+            <a href="/admin" class="btn">PG admin</a>
+            <a href="/status" class="btn">Status</a>
+            <a href="/api/v1" class="btn">Swagger</a>
+            <a href="/image.png" class="btn">S21_PNG</a>
+        </div>
+    </div>
+</body>
+</html>
